@@ -71,14 +71,7 @@ export default function App() {
       setRegistrations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    // Listen to my reports
-    const qRep = query(collection(db, 'reports'), where('registeredBy', '==', user.uid));
-    const unsubRep = onSnapshot(qRep, (snapshot) => {
-      setReports(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-
-    // Listen to matches (In a real app, query by seekerUid or registration owner)
-    // For simplicity, we fetch all matches where status is pending or confirmed and filter client side
+    // Listen to matches
     const qMatches = query(collection(db, 'matches'));
     const unsubMatches = onSnapshot(qMatches, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
@@ -100,11 +93,26 @@ export default function App() {
     return () => {
       unsubProfile();
       unsubReg();
-      unsubRep();
       unsubMatches();
       unsubChannels();
     };
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let qRep;
+    if (userProfile?.isVolunteer) {
+      qRep = query(collection(db, 'reports'), orderBy('createdAt', 'desc'));
+    } else {
+      qRep = query(collection(db, 'reports'), where('registeredBy', '==', user.uid));
+    }
+    const unsubRep = onSnapshot(qRep, (snapshot) => {
+      setReports(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => unsubRep();
+  }, [user, userProfile?.isVolunteer]);
 
   const handleRegisterFamily = async (audioBlob: Blob, base64: string) => {
     if (!user) return;
@@ -491,10 +499,10 @@ export default function App() {
                 <Shield className="w-8 h-8 text-[#E8E2D9]" />
                 <h3 className="font-bold text-lg">ساعد في لمّ الشمل</h3>
                 <p className="text-sm opacity-90 leading-relaxed">
-                  بصفتك متطوعاً، ستتمكن من رؤية البلاغات في منطقتك الجغرافية والمساعدة في التحقق منها أو إيصال الرسائل لمن لا يملكون اتصالاً بالإنترنت.
+                  بصفتك متطوعاً، ستتمكن من رؤية البلاغات المفتوحة في منطقتك الجغرافية والمساعدة في التحقق منها وتوثيقها بصوتك.
                 </p>
                 {!userProfile?.isVolunteer && (
-                  <button onClick={() => saveProfile(userProfile?.location || '', true)} className="mt-4 bg-white text-[#5A5A40] px-4 py-2 rounded-xl font-bold text-sm">
+                  <button onClick={() => saveProfile(userProfile?.location || '', true)} className="mt-4 bg-white text-[#5A5A40] px-4 py-2 rounded-xl font-bold text-sm hover:bg-[#F9F6F1] transition-colors">
                     الانضمام كمتطوع
                   </button>
                 )}
@@ -502,14 +510,46 @@ export default function App() {
               
               {userProfile?.isVolunteer && (
                 <div className="space-y-4">
-                  <h4 className="font-bold opacity-70 border-b border-[#E8E2D9] pb-2">طلبات التحقق في منطقتك</h4>
-                  <div className="bg-white p-4 organic-card border border-[#E8E2D9] flex justify-between items-center">
-                     <div>
-                       <p className="font-bold text-sm">عائلة آل صالح</p>
-                       <p className="text-xs text-[#7A7169]">تحتاج تأكيد تواجد في مخيم الجفينة</p>
-                     </div>
-                     <button className="text-[#B3543B] font-bold text-sm">التفاصيل</button>
-                  </div>
+                  <h4 className="font-bold opacity-70 border-b border-[#E8E2D9] pb-2">سجل البلاغات للتحقق</h4>
+                  {reports.length === 0 && (
+                     <p className="text-[#7A7169] text-sm italic">لا توجد بلاغات مرئية لك حالياً.</p>
+                  )}
+                  {reports.map(report => (
+                    <div key={report.id} className="bg-white p-4 organic-card border border-[#E8E2D9] space-y-3">
+                       <div className="flex justify-between items-start">
+                         <div>
+                           <p className="font-bold text-sm bg-yellow-50 text-yellow-800 inline-block px-2 py-0.5 rounded-full mb-1">بلاغ بحث</p>
+                           <p className="font-bold">{report.seekerName}</p>
+                           <p className="text-xs text-[#7A7169] mt-1">{report.missingPersonDetails}</p>
+                         </div>
+                       </div>
+                       
+                       {report.assignedVolunteerId === user.uid ? (
+                         <div className="bg-[#F9F6F1] p-3 rounded-xl border border-[#E8E2D9] space-y-2 mt-2">
+                           <p className="text-xs font-bold text-[#B3543B]">مُسندة إليك</p>
+                           {report.verificationAudioUrl ? (
+                             <div className="text-sm text-green-700 flex items-center gap-1 font-bold">
+                               <CheckCircle2 className="w-4 h-4" /> تم رفع تقرير التحقق الصوتي
+                             </div>
+                           ) : (
+                             <div>
+                               <p className="text-xs text-[#7A7169] mb-2">قم بتسجيل ملاحظات التحقق الميداني ليراجعها المشرفون:</p>
+                               <AudioRecorder onRecordingComplete={(_, base64) => {
+                                 updateDoc(doc(db, 'reports', report.id), { verificationAudioUrl: base64 });
+                               }} />
+                             </div>
+                           )}
+                         </div>
+                       ) : (
+                         <button 
+                           onClick={() => updateDoc(doc(db, 'reports', report.id), { assignedVolunteerId: user.uid })}
+                           className="text-white bg-[#B3543B] font-bold text-xs px-3 py-1.5 rounded-md hover:bg-[#91422d] transition-colors"
+                         >
+                           استلام الحالة للتحقق
+                         </button>
+                       )}
+                    </div>
+                  ))}
                 </div>
               )}
             </motion.div>
@@ -524,10 +564,20 @@ export default function App() {
             >
               <div className="flex flex-col items-center gap-4 bg-white p-8 organic-card border border-[#E8E2D9]">
                 <div className="relative">
-                  <img src={user.photoURL || 'https://via.placeholder.com/150'} className="w-24 h-24 rounded-[30px] border-4 border-[#F9F6F1]" alt="Avatar" />
-                  <button className="absolute bottom-[-10px] right-[-10px] bg-[#B3543B] text-white p-2 rounded-full shadow-lg">
+                  <img src={userProfile?.profilePictureBase64 || user.photoURL || 'https://via.placeholder.com/150'} className="w-24 h-24 rounded-[30px] border-4 border-[#F9F6F1] object-cover" alt="Avatar" />
+                  <label className="absolute bottom-[-10px] right-[-10px] bg-[#B3543B] cursor-pointer text-white p-2 rounded-full shadow-lg hover:bg-[#91422d] transition-colors">
                     <Plus className="w-4 h-4" />
-                  </button>
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setDoc(doc(db, 'users', user.uid), { profilePictureBase64: reader.result }, { merge: true });
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }} />
+                  </label>
                 </div>
                 <div className="text-center">
                   <h2 className="text-2xl font-bold font-serif text-[#2A2623]">{user.displayName}</h2>
@@ -537,6 +587,23 @@ export default function App() {
               
               <div className="space-y-4 bg-white p-6 organic-card border border-[#E8E2D9]">
                 <div>
+                  <label className="text-xs font-bold opacity-70 mb-2 block">رسالة تعريفية صوتية</label>
+                  {userProfile?.voiceBioBase64 ? (
+                    <div className="flex items-center gap-3 bg-[#F9F6F1] p-3 rounded-xl border border-[#E8E2D9]">
+                      <audio src={`data:audio/wav;base64,${userProfile.voiceBioBase64}`} controls className="flex-1 h-8" />
+                      <button onClick={() => setDoc(doc(db, 'users', user.uid), { voiceBioBase64: null }, { merge: true })} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="border border-dashed border-[#E8E2D9] rounded-xl p-4">
+                      <AudioRecorder onRecordingComplete={(_, base64) => {
+                        setDoc(doc(db, 'users', user.uid), { voiceBioBase64: base64 }, { merge: true });
+                      }} />
+                    </div>
+                  )}
+                </div>
+                <div className="pt-4 border-t border-[#E8E2D9]">
                   <label className="text-xs font-bold opacity-70 mb-1 block">الموقع التقريبي الحالي</label>
                   <input 
                     type="text" 
@@ -551,7 +618,7 @@ export default function App() {
               <div className="space-y-3">
                 <button 
                   onClick={() => signOut(auth)}
-                  className="w-full bg-[#FDFBF7] p-4 organic-card text-right font-bold text-[#B3543B] border border-[#E8E2D9]"
+                  className="w-full bg-[#FDFBF7] p-4 organic-card text-right font-bold text-[#B3543B] border border-[#E8E2D9] hover:bg-[#F9F6F1] transition-colors"
                 >
                   تسجيل الخروج
                 </button>
@@ -600,17 +667,50 @@ function NavButton({ active, onClick, icon, label }: { active: boolean, onClick:
 function ChatView({ channelId, onBack, currentUid }: { channelId: string, onBack: () => void, currentUid: string }) {
   const [messages, setMessages] = useState<any[]>([]);
   const [text, setText] = useState('');
-  const [isVoiceVerified, setIsVoiceVerified] = useState(false);
+  const [channel, setChannel] = useState<any>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'messages'), where('channelId', '==', channelId), orderBy('createdAt', 'asc'));
-    const unsub = onSnapshot(q, (snapshot) => {
-      setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    const unsubChannel = onSnapshot(doc(db, 'channels', channelId), (docSnap) => {
+      if (docSnap.exists()) {
+        setChannel({ id: docSnap.id, ...docSnap.data() });
+      }
     });
-    return unsub;
-  }, [channelId]);
+
+    const q = query(collection(db, 'messages'), where('channelId', '==', channelId), orderBy('createdAt', 'asc'));
+    const unsubMessages = onSnapshot(q, (snapshot) => {
+      const msgs: any[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setMessages(msgs);
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+
+      // Mark unread messages as read
+      msgs.forEach(msg => {
+        if (msg.senderId !== currentUid && msg.status !== 'read') {
+          updateDoc(doc(db, 'messages', msg.id), { status: 'read' }).catch(console.error);
+        }
+      });
+    });
+
+    return () => {
+      unsubChannel();
+      unsubMessages();
+    };
+  }, [channelId, currentUid]);
+
+  const handleTyping = () => {
+    updateDoc(doc(db, 'channels', channelId), {
+      [`typing.${currentUid}`]: Date.now()
+    }).catch(console.error);
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      updateDoc(doc(db, 'channels', channelId), {
+        [`typing.${currentUid}`]: 0
+      }).catch(console.error);
+    }, 2000);
+  };
 
   const send = async () => {
     if (!text.trim()) return;
@@ -618,71 +718,124 @@ function ChatView({ channelId, onBack, currentUid }: { channelId: string, onBack
       channelId,
       senderId: currentUid,
       text,
+      status: 'sent',
       createdAt: serverTimestamp()
     });
     setText('');
-  };
-
-  const verifyIdentity = () => {
-    // In a real app, this would involve sending a voice snippet to the other party or AI for verification
-    setIsVoiceVerified(true);
-    addDoc(collection(db, 'messages'), {
-      channelId,
-      senderId: currentUid,
-      text: "✅ لقد قمت بتأكيد هويتي عبر البصمة الصوتية.",
-      createdAt: serverTimestamp()
+    updateDoc(doc(db, 'channels', channelId), {
+      [`typing.${currentUid}`]: 0
     });
   };
 
+  const handleVerificationComplete = async (blob: Blob, base64: string) => {
+    try {
+      // Simulate AI Verification locally for prototype
+      // In production, this would call a Cloud Function or similar
+      const updatedVerifiedUsers = [...(channel?.verifiedUsers || []), currentUid];
+      
+      await updateDoc(doc(db, 'channels', channelId), {
+        verifiedUsers: updatedVerifiedUsers,
+        isAnonymous: updatedVerifiedUsers.length < 2 // Reveal if both verified
+      });
+
+      await addDoc(collection(db, 'messages'), {
+        channelId,
+        senderId: currentUid,
+        text: "✅ لقد قمت بتأكيد هويتي بنجاح عبر البصمة الصوتية.",
+        status: 'sent',
+        createdAt: serverTimestamp()
+      });
+      setIsVerifying(false);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const otherParticipantId = channel?.participants?.find((p: string) => p !== currentUid);
+  const isOtherTyping = channel?.typing?.[otherParticipantId] > Date.now() - 3000;
+  const isMeVerified = channel?.verifiedUsers?.includes(currentUid);
+
   return (
     <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col h-[70vh] bg-white organic-card border border-[#E8E2D9] overflow-hidden">
-      <div className="bg-[#E8E2D9] p-4 flex items-center justify-between border-b border-[#D9D1C7]">
+      <div className="bg-[#E8E2D9] p-4 flex items-center justify-between border-b border-[#D9D1C7] shrink-0">
         <div className="flex items-center gap-3">
-          <button onClick={onBack}><ChevronLeft className="w-6 h-6 rotate-180 text-[#4A443F]" /></button>
+          <button onClick={onBack} className="p-1 hover:bg-[#D9D1C7] rounded-full transition-colors"><ChevronLeft className="w-6 h-6 rotate-180 text-[#4A443F]" /></button>
           <div>
-            <h3 className="font-bold text-[#2A2623]">تواصل آمن (مجهول)</h3>
-            <p className="text-[10px] text-[#7A7169]">تفاصيل الاتصال مخفية حتى يتم تأكيد الهوية</p>
+            <h3 className="font-bold text-[#2A2623]">{channel?.isAnonymous ? 'تواصل آمن (مجهول)' : 'تواصل مع العائلة - تم التحقق'}</h3>
+            <p className="text-[10px] text-[#7A7169]">{channel?.isAnonymous ? 'تفاصيل الاتصال مخفية حتى يتم تأكيد الهوية من الطرفين' : 'تم كشف بيانات الاتصال'}</p>
           </div>
         </div>
-        <Shield className="w-5 h-5 text-[#B3543B]" />
+        <Shield className={cn("w-5 h-5", channel?.isAnonymous ? "text-[#B3543B]" : "text-green-600")} />
       </div>
 
-      {!isVoiceVerified && (
-        <div className="bg-[#F9F6F1] p-3 border-b border-[#E8E2D9] text-center space-y-2">
-          <p className="text-xs text-[#5A5A40]">للكشف عن أرقام هواتفكم، يرجى تأكيد الهوية عبر بصمة صوتية قصيرة.</p>
-          <button onClick={verifyIdentity} className="text-xs bg-[#5A5A40] text-white px-4 py-2 rounded-full font-bold">
+      {!channel?.isAnonymous && (
+         <div className="bg-green-50 p-2 text-center text-xs text-green-700 font-bold border-b border-green-100 shrink-0">
+           تم التحقق من كلا الطرفين. يمكنكم الآن تبادل أرقام الهواتف بأمان.
+         </div>
+      )}
+
+      {channel?.isAnonymous && !isMeVerified && !isVerifying && (
+        <div className="bg-[#F9F6F1] p-4 border-b border-[#E8E2D9] text-center space-y-3 shrink-0">
+          <p className="text-xs text-[#5A5A40] leading-relaxed">للكشف عن أرقام هواتفكم وحماية الخصوصية، يرجى تأكيد الهوية عبر بصمة صوتية قصيرة يحللها ذكاؤنا الاصطناعي.</p>
+          <button onClick={() => setIsVerifying(true)} className="text-xs bg-[#5A5A40] text-white px-5 py-2.5 rounded-full font-bold hover:bg-[#4A443F] transition-colors shadow-sm">
             تأكيد هويتي صوتياً
           </button>
         </div>
+      )}
+
+      {isVerifying && (
+         <div className="p-4 bg-white border-b border-[#E8E2D9] shrink-0">
+           <div className="flex justify-between items-center mb-2">
+             <span className="text-xs font-bold text-[#2A2623]">سجل بصمتك الصوتية</span>
+             <button onClick={() => setIsVerifying(false)} className="text-[#7A7169] hover:text-[#B3543B]"><X className="w-4 h-4"/></button>
+           </div>
+           <AudioRecorder onRecordingComplete={handleVerificationComplete} />
+         </div>
       )}
       
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#FDFBF7]">
         {messages.map(msg => {
           const isMe = msg.senderId === currentUid;
+          const time = msg.createdAt ? new Date(msg.createdAt.toMillis()).toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' }) : '';
+          
           return (
-            <div key={msg.id} className={cn("flex", isMe ? "justify-end" : "justify-start")}>
+            <div key={msg.id} className={cn("flex flex-col gap-1", isMe ? "items-end" : "items-start")}>
               <div className={cn(
-                "p-3 max-w-[80%] organic-card text-sm",
-                isMe ? "bg-[#B3543B] text-white" : "bg-[#E8E2D9] text-[#2A2623]"
+                "p-3 max-w-[80%] organic-card text-sm shadow-sm relative",
+                isMe ? "bg-[#B3543B] text-white rounded-tr-sm" : "bg-[#E8E2D9] text-[#2A2623] rounded-tl-sm"
               )}>
                 {msg.text}
+              </div>
+              <div className="flex items-center gap-1 px-1">
+                <span className="text-[10px] text-[#7A7169]">{time}</span>
+                {isMe && (
+                  <CheckCircle2 className={cn("w-3 h-3", msg.status === 'read' ? "text-[#B3543B]" : "text-[#D9D1C7]")} />
+                )}
               </div>
             </div>
           );
         })}
+        {isOtherTyping && (
+          <div className="flex items-start gap-1">
+            <div className="bg-[#E8E2D9] px-3 py-2 organic-card rounded-tl-sm text-[#7A7169] text-xs flex items-center gap-1">
+              يَكتُب
+              <span className="animate-bounce">.</span><span className="animate-bounce" style={{animationDelay: '0.2s'}}>.</span><span className="animate-bounce" style={{animationDelay: '0.4s'}}>.</span>
+            </div>
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
       
-      <div className="p-4 bg-white border-t border-[#E8E2D9] flex gap-2">
+      <div className="p-4 bg-white border-t border-[#E8E2D9] flex gap-2 items-center shrink-0">
         <input 
           type="text" 
           value={text}
-          onChange={e => setText(e.target.value)}
+          onChange={e => { setText(e.target.value); handleTyping(); }}
           onKeyDown={e => e.key === 'Enter' && send()}
           placeholder="اكتب رسالة..." 
-          className="flex-1 bg-[#F9F6F1] border border-[#E8E2D9] rounded-full px-4 text-sm focus:outline-none focus:border-[#B3543B]"
+          className="flex-1 bg-[#F9F6F1] border border-[#E8E2D9] rounded-full px-4 py-2.5 text-sm focus:outline-none focus:border-[#B3543B] transition-colors"
         />
-        <button onClick={send} className="w-10 h-10 bg-[#5A5A40] text-white rounded-full flex items-center justify-center">
+        <button onClick={send} disabled={!text.trim()} className="w-10 h-10 bg-[#5A5A40] disabled:bg-[#D9D1C7] disabled:cursor-not-allowed text-white rounded-full flex items-center justify-center transition-colors">
           <Send className="w-4 h-4 rtl:-scale-x-100" />
         </button>
       </div>

@@ -35,6 +35,7 @@ service cloud.firestore {
     match /messages/{messageId} {
       allow create: if isSignedIn() && request.auth.uid == request.resource.data.senderId;
       allow read: if isSignedIn(); // In production, we should check if user is in channel
+      allow update: if isSignedIn(); // Allowing recipients to update read receipts
     }
 
     // Registrations

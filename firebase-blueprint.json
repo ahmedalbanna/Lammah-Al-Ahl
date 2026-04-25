@@ -31,6 +31,7 @@
         "audioTranscription": { "type": "string", "description": "AI-transcribed text of the audio." },
         "seekerContact": { "type": "string", "description": "How to reach the seeker." },
         "registeredBy": { "type": "string", "description": "UID of the seeker user." },
+        "assignedVolunteerId": { "type": "string", "description": "UID of the assigned volunteer." },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["seekerName", "registeredBy", "createdAt"]
@@ -57,6 +58,8 @@
         "userId": { "type": "string" },
         "location": { "type": "string" },
         "isVolunteer": { "type": "boolean" },
+        "profilePictureBase64": { "type": "string" },
+        "voiceBioBase64": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "createdAt"]
@@ -69,6 +72,8 @@
         "matchId": { "type": "string" },
         "participants": { "type": "array", "items": { "type": "string" } },
         "isAnonymous": { "type": "boolean" },
+        "typing": { "type": "object" },
+        "verifiedUsers": { "type": "array", "items": { "type": "string" } },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["matchId", "participants", "isAnonymous", "createdAt"]
@@ -81,6 +86,7 @@
         "channelId": { "type": "string" },
         "senderId": { "type": "string" },
         "text": { "type": "string" },
+        "status": { "type": "string", "enum": ["sent", "read"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["channelId", "senderId", "text", "createdAt"]
