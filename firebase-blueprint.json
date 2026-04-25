@@ -49,8 +49,56 @@
       },
       "required": ["registrationId", "reportId", "status", "createdAt"]
     }
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Additional details for the user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "location": { "type": "string" },
+        "isVolunteer": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "createdAt"]
+    },
+    "ChatChannel": {
+      "title": "Chat Channel",
+      "description": "Secure communication channel between users.",
+      "type": "object",
+      "properties": {
+        "matchId": { "type": "string" },
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "isAnonymous": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["matchId", "participants", "isAnonymous", "createdAt"]
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "Message within a chat channel.",
+      "type": "object",
+      "properties": {
+        "channelId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["channelId", "senderId", "text", "createdAt"]
+    }
   },
   "firestore": {
+    "users": {
+      "schema": "UserProfile",
+      "description": "Collection of user profiles."
+    },
+    "channels": {
+      "schema": "ChatChannel",
+      "description": "Collection of chat channels."
+    },
+    "messages": {
+      "schema": "ChatMessage",
+      "description": "Collection of chat messages."
+    },
     "registrations": {
       "schema": "FamilyRegistration",
       "description": "Collection of registered families."

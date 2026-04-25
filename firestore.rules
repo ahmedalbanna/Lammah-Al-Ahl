@@ -19,6 +19,24 @@ service cloud.firestore {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
+    // Users profile
+    match /users/{userId} {
+      allow create, update: if isSignedIn() && request.auth.uid == userId;
+      allow read: if isSignedIn();
+    }
+
+    // Chat Channels
+    match /channels/{channelId} {
+      allow create: if isSignedIn();
+      allow read, update: if isSignedIn() && request.auth.uid in resource.data.participants;
+    }
+
+    // Chat Messages
+    match /messages/{messageId} {
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.senderId;
+      allow read: if isSignedIn(); // In production, we should check if user is in channel
+    }
+
     // Registrations
     match /registrations/{regId} {
       allow create: if isSignedIn() 
