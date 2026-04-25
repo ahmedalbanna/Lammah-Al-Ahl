@@ -1,0 +1,67 @@
+{
+  "entities": {
+    "FamilyRegistration": {
+      "title": "Family Registration",
+      "description": "Information about a family that is currently present and registered.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "headName": { "type": "string", "description": "Name of the head of the family or well-known name." },
+        "originLocation": { "type": "string", "description": "Original place (village, district, governorate)." },
+        "currentLocation": { "type": "string", "description": "Current approximate location." },
+        "members": { "type": "string", "description": "List of present family members." },
+        "contactInfo": { "type": "string", "description": "Phone number or alternative contact." },
+        "audioUrl": { "type": "string", "description": "URL to the audio recording (voice fingerprint)." },
+        "audioTranscription": { "type": "string", "description": "AI-transcribed text of the audio." },
+        "registeredBy": { "type": "string", "description": "UID of the user who registered this." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["headName", "registeredBy", "createdAt"]
+    },
+    "MissingPersonReport": {
+      "title": "Missing Person Report",
+      "description": "Information provided by someone searching for a missing relative.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "seekerName": { "type": "string", "description": "Name of the person searching." },
+        "missingPersonDetails": { "type": "string", "description": "Description of the missing person (name, age, appearance)." },
+        "lastSeenLocation": { "type": "string", "description": "Where they were last seen." },
+        "audioUrl": { "type": "string", "description": "Audio recording of the seeker explaining the situation." },
+        "audioTranscription": { "type": "string", "description": "AI-transcribed text of the audio." },
+        "seekerContact": { "type": "string", "description": "How to reach the seeker." },
+        "registeredBy": { "type": "string", "description": "UID of the seeker user." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["seekerName", "registeredBy", "createdAt"]
+    },
+    "Match": {
+      "title": "Potential Match",
+      "description": "A potential match between a registration and a report.",
+      "type": "object",
+      "properties": {
+        "registrationId": { "type": "string" },
+        "reportId": { "type": "string" },
+        "confidence": { "type": "number", "description": "AI confidence score (0 to 1)." },
+        "reason": { "type": "string", "description": "Why this was matched." },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["registrationId", "reportId", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "registrations": {
+      "schema": "FamilyRegistration",
+      "description": "Collection of registered families."
+    },
+    "reports": {
+      "schema": "MissingPersonReport",
+      "description": "Collection of missing person search reports."
+    },
+    "matches": {
+      "schema": "Match",
+      "description": "Collection of potential matches identified by the system."
+    }
+  }
+}

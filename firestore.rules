@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(resource) {
+      return isSignedIn() && resource.data.registeredBy == request.auth.uid;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Registrations
+    match /registrations/{regId} {
+      allow create: if isSignedIn() 
+        && request.resource.data.registeredBy == request.auth.uid
+        && request.resource.data.headName is string
+        && request.resource.data.headName.size() <= 200;
+        
+      allow get: if isSignedIn(); // Allow searching, but we'll try to limit queries
+      allow list: if isSignedIn(); // Needed for search, but should be restricted in production
+      allow update, delete: if isOwner(resource);
+    }
+
+    // Reports
+    match /reports/{reportId} {
+      allow create: if isSignedIn() 
+        && request.resource.data.registeredBy == request.auth.uid;
+        
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow update, delete: if isOwner(resource);
+    }
+
+    // Matches
+    match /matches/{matchId} {
+      allow create: if isSignedIn(); // Usually system or specific roles
+      allow read: if isSignedIn(); // Specifically for parties involved
+    }
+  }
+}

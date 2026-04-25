@@ -1,0 +1,12 @@
+{
+  "name": "لمّة الأهل (Lammah Al-Ahl)",
+  "description": "منصة إنسانية لجمع شتات العائلات اليمنية النازحة عبر التسجيل الصوتي والبحث الذكي.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "Audio Processing",
+    "AI Matching",
+    "Real-time Databases"
+  ]
+}
